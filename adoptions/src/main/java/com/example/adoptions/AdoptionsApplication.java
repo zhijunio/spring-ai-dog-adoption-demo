@@ -6,14 +6,14 @@ import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
-import org.springframework.ai.mcp.customizer.McpSyncClientCustomizer;
+import org.springframework.ai.mcp.customizer.McpClientCustomizer;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.SpringApplication;
@@ -42,7 +42,7 @@ public class AdoptionsApplication {
     }
 
     @Bean
-    PromptChatMemoryAdvisor promptChatMemoryAdvisor(DataSource dataSource) {
+    MessageChatMemoryAdvisor messageChatMemoryAdvisor(DataSource dataSource) {
         var jdbc = JdbcChatMemoryRepository
                 .builder()
                 .dataSource(dataSource)
@@ -53,7 +53,7 @@ public class AdoptionsApplication {
                 .chatMemoryRepository(jdbc)
                 .build();
 
-        return PromptChatMemoryAdvisor
+        return MessageChatMemoryAdvisor
                 .builder(chatMessageWindow)
                 .build();
     }
@@ -67,7 +67,7 @@ public class AdoptionsApplication {
     }
 
     @Bean
-    McpSyncClientCustomizer customizeMcpClient() {
+    McpClientCustomizer<McpClient.SyncSpec> customizeMcpClient() {
         return (name, mcpClientSpec) -> {
             mcpClientSpec.toolsChangeConsumer(tv -> {
                 logger.info("\nMCP TOOLS CHANGE: " + tv);
@@ -85,7 +85,7 @@ class AdoptionsController {
 
     AdoptionsController(JdbcClient db,
                         McpSyncClient mcpSyncClient,
-                        PromptChatMemoryAdvisor promptChatMemoryAdvisor,
+                        MessageChatMemoryAdvisor messageChatMemoryAdvisor,
                         ChatClient.Builder builder,
                         DogRepository repository,
                         VectorStore vectorStore) {
@@ -107,7 +107,7 @@ class AdoptionsController {
                 """;
         this.chatClient = builder
                 .defaultToolCallbacks(new SyncMcpToolCallbackProvider(mcpSyncClient))
-                .defaultAdvisors(promptChatMemoryAdvisor, QuestionAnswerAdvisor.builder(vectorStore).build())
+                .defaultAdvisors(messageChatMemoryAdvisor, QuestionAnswerAdvisor.builder(vectorStore).build())
                 .defaultSystem(system)
                 .build();
     }
